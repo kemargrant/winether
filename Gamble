@@ -1,0 +1,120 @@
+
+contract Gamble is usingOraclize {
+    uint Cashpot;
+    uint Service_Fee;
+    uint Gross;
+    uint Ticket;
+    address Owner;
+    string Power_Ball;
+    bool Power_Ball_Set;
+    event Prize(string text,uint amount,string ticket);
+    event Notify_Number(string text,uint amount);
+    event Notify_String(string text,string ticket);
+    event Loser(string text,string ticket);
+    event Balance(string text,uint balance,address user);
+    event newOraclizeQuery(string text);
+    event Tickets_Sold(string text,uint sold);
+    mapping(address => string) Tickets;
+    mapping(uint => address) Ticket_Number;
+    function Gamble()
+        {
+            Prize("Prize ",Cashpot,Power_Ball);
+            Power_Ball_Set = false;
+        }
+     function __callback(bytes32 myid, string result) {
+        if (msg.sender != oraclize_cbAddress()) throw;
+        if(!Power_Ball_Set)
+            {	
+				Power_Ball = result;
+				Power_Ball_Set = true;
+				Prize("Winning numbers set",Cashpot,result);
+            }
+        else
+            {
+				Tickets[Ticket_Number[Ticket]] = result;
+				Notify_String("Ticket",Tickets[Ticket_Number[Ticket]]);
+				bytes32 hash =  sha3(Power_Ball);
+				bytes32 ticket_hash = sha3(Tickets[Ticket_Number[Ticket]]);
+				if(hash != ticket_hash)
+					{
+						Loser("Lost",Tickets[Ticket_Number[Ticket]]);
+						if(ticket_hash == sha3("1\n1\n1\n")){small_payout(1);}
+						if(ticket_hash == sha3("2\n2\n2\n")){small_payout(2);}
+						if(ticket_hash == sha3("3\n3\n4\n")){small_payout(3);}
+						if(ticket_hash == sha3("4\n4\n4\n")){small_payout(3);}
+						if(ticket_hash == sha3("5\n5\n5\n")){small_payout(4);}
+						if(ticket_hash == sha3("6\n6\n6\n")){small_payout(4);}
+						if(ticket_hash == sha3("7\n7\n7\n")){small_payout(5);}
+						if(ticket_hash == sha3("8\n8\n8\n")){small_payout(4);}
+						if(ticket_hash == sha3("9\n9\n9\n")){small_payout(3);}
+					}
+				else
+					{
+						Service_Fee = Cashpot / 20;
+						Gross = (Cashpot - Service_Fee) * 9/10;
+						if(!Owner.send(Service_Fee))
+						{
+						    Notify_Number("Problem sending service fee:",Service_Fee);
+						    throw;
+						}
+						Balance("Your Old Balance Is:",Ticket_Number[Ticket].balance,Ticket_Number[Ticket]);
+						Cashpot = Cashpot - Service_Fee;
+						if(!Ticket_Number[Ticket].send(Gross))
+						{
+						    Notify_Number("Problem sending ether pot:",Gross);
+						    throw;
+						}
+						Balance("Your New Balance Is:",Ticket_Number[Ticket].balance,Ticket_Number[Ticket]);
+						Notify_Number("Winner:",Gross);  
+						Cashpot = Cashpot - Gross;   
+						Power_Ball_Set = false;
+						Service_Fee = 0;
+						Gross = 0;
+                        newOraclizeQuery("Oraclize query was sent, standing by for the answer..");
+			            oraclize_query("URL", "https://www.random.org/integers/?num=3&min=1&max=9&col=1&base=10&format=plain&rnd=new");					}    
+            }
+    }    
+	function draw() payable
+		{
+		     if(msg.value * 50 < 1 ether){throw;}
+		     if(Owner == 0 ){Owner = msg.sender;}
+			 Cashpot += msg.value;
+			 Ticket += 1;
+			 Ticket_Number[Ticket] = msg.sender;
+             newOraclizeQuery("Oraclize query was sent, standing by for the answer..");
+			 oraclize_query("URL", "https://www.random.org/integers/?num=3&min=1&max=9&col=1&base=10&format=plain&rnd=new");
+			 Tickets_Sold("Tickets Sold:",Ticket);
+		}
+	function small_payout (uint bonus)
+		{
+		    if (msg.sender != oraclize_cbAddress()) throw;
+		    Notify_String("Bonus Payout",Tickets[Ticket_Number[Ticket]]);
+			Service_Fee = Cashpot / 20;
+			Gross = (Cashpot - Service_Fee) * bonus/10;
+			if(!Owner.send(Service_Fee))
+			{
+			    Notify_Number("Problem sending service fee:",Service_Fee);
+			    throw;
+			}
+			Balance("Your Old Balance Is:",Ticket_Number[Ticket].balance,Ticket_Number[Ticket]);
+			Cashpot = Cashpot - Service_Fee;
+			if(!Ticket_Number[Ticket].send(Gross))
+			{
+			    Notify_Number("Problem sending ether pot:",Gross);
+			    throw;
+			}
+			Balance("Your New Balance Is:",Ticket_Number[Ticket].balance,Ticket_Number[Ticket]);
+			Notify_Number("Winner:",Gross);  
+			Cashpot = Cashpot - Gross;   
+			Service_Fee = 0;
+			Gross = 0;
+		}
+	function check_prize() returns (uint)
+	   {
+	       return this.balance;
+	   } 
+	function winning_ticket() returns (string)
+		{
+			return Power_Ball;
+		}
+}
